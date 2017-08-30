@@ -46,6 +46,22 @@ export default class Yeelight extends EventEmitter {
 
     this.socket.on('data', this.formatResponse.bind(this));
 
+    this.socket.on('close', () => {
+      this.log(`closed connection to ${this.name} ${this.hostname}:${this.port}`);
+    });
+
+    this.socket.on('error', (err) => {
+      if (err.code == 'ECONNRESET') {
+        this.log(`Connection reset on id ${this.id} ${this.hostname}:${this.port} connection, `);
+        this.socket.connect(this.port, this.hostname, () => {
+          this.log(`Reconnecting to ${this.name} ${this.hostname}:${this.port}`);
+          this.emit('connected');
+        });
+      } else {
+        this.emit('error', this.id, `Connection error on ${this.hostname}:${this.port}`, err);
+      }
+	   });
+
     this.socket.connect(this.port, this.hostname, () => {
       this.log(`connected to ${this.name} ${this.hostname}:${this.port}`);
       this.emit('connected');
@@ -86,6 +102,7 @@ export default class Yeelight extends EventEmitter {
 
         this.socket.write(`${req}\r\n`, (err) => {
           if (err) {
+            this.log(`Error sending req: ${req} on ${err.address}`);
             reject(err);
             return;
           }
