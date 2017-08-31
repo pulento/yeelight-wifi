@@ -1,7 +1,8 @@
 import EventEmitter from 'events';
 import { Client } from 'node-ssdp';
-
+import debug from 'debug';
 import Yeelight from './Yeelight';
+import YeelightStatus from './Yeelight';
 
 /**
  * Create a new instance of the YeelightSearch class
@@ -16,6 +17,7 @@ class YeelightSearch extends EventEmitter {
     super();
 
     this.yeelights = [];
+    this.log = debug(`YeelightSearch`);
     // Setting the sourcePort ensures multicast traffic is received
     this.client = new Client({ sourcePort: 1982, ssdpPort: 1982 });
 
@@ -35,6 +37,13 @@ class YeelightSearch extends EventEmitter {
       yeelight = new Yeelight(lightdata);
       this.yeelights.push(yeelight);
       this.emit('found', yeelight);
+    } else {
+      if (yeelight.status == 0) {
+        // Reconnect to light
+        this.log(`Light id ${lightdata.ID} comming up`);
+        yeelight.status = YeelightStatus.SSDP;
+        yeelight.reconnect(lightdata);
+      }
     }
   }
 
