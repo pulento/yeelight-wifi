@@ -6,6 +6,14 @@ import EventEmitter from 'events';
 
 import { hexToRgb } from './utils';
 
+const yeelight = {
+  Status : {
+    OFFLINE : 0,
+    SSDP : 1,
+    ONLINE : 2
+  }
+}
+
 /**
  * Class Yeelight provides all functionality
  * @param {object} yeelightData
@@ -38,6 +46,7 @@ export default class Yeelight extends EventEmitter {
     this.port = parsedUri.port;
     this.hostname = parsedUri.hostname;
     this.supports = data.SUPPORT.split(' ');
+    this.status = yeelight.Status.SSDP;
 
     this.reqCount = 1;
     this.log = debug(`Yeelight-${this.name}`);
@@ -48,23 +57,29 @@ export default class Yeelight extends EventEmitter {
 
     this.socket.on('close', () => {
       this.log(`closed connection to ${this.name} ${this.hostname}:${this.port}`);
+      this.status = yeelight.Status.OFFLINE;
     });
 
     this.socket.on('error', (err) => {
       if (err.code == 'ECONNRESET') {
-        this.log(`Connection reset on id ${this.id} ${this.hostname}:${this.port} connection, `);
+        this.log(`Connection reset on id ${this.id} ${this.hostname}:${this.port} connection`);
+        this.status = yeelight.Status.OFFLINE;
         this.socket.connect(this.port, this.hostname, () => {
           this.log(`Reconnecting to ${this.name} ${this.hostname}:${this.port}`);
           this.emit('connected');
+          this.status = yeelight.Status.ONLINE;
         });
-      } else {
-        this.emit('error', this.id, `Connection error on ${this.hostname}:${this.port}`, err);
+      } else if (err.code == 'ECONNREFUSED' ) {
+        this.status = yeelight.Status.OFFLINE;
+        this.log(`Connection refused on id ${this.id} ${this.hostname}:${this.port} connection`);
+        this.emit('error', this.id, `Connection refused on ${this.hostname}:${this.port}`, err);
       }
 	   });
 
     this.socket.connect(this.port, this.hostname, () => {
       this.log(`connected to ${this.name} ${this.hostname}:${this.port}`);
       this.emit('connected');
+      this.status = yeelight.Status.ONLINE;
     });
   }
 
@@ -98,17 +113,23 @@ export default class Yeelight extends EventEmitter {
           params: value,
           id: this.reqCount,
         });
-        this.log(`sending req: ${req}`);
 
-        this.socket.write(`${req}\r\n`, (err) => {
-          if (err) {
-            this.log(`Error sending req: ${req} on ${err.address}`);
-            reject(err);
-            return;
-          }
-          resolve();
-        });
-        this.reqCount += 1;
+        // Avoid to send data on stale sockets
+        if ( this.status > yeelight.Status.OFFLINE ) {
+          this.log(`sending req: ${req}`);
+
+          this.socket.write(`${req}\r\n`, (err) => {
+            if (err) {
+              this.log(`Error sending req: ${req} on ${err.address}`);
+              reject(err);
+              return;
+            }
+          });
+          this.reqCount += 1;
+        } else {
+          this.log(`Not sending request for offline bulb`);
+        }
+        resolve();
       });
     });
   }
