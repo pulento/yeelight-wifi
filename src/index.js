@@ -4,6 +4,8 @@ import debug from 'debug';
 import Yeelight from './Yeelight';
 import YeelightStatus from './Yeelight';
 
+const SocketRefresh = 300000;
+
 /**
  * Create a new instance of the YeelightSearch class
  * and start searching for new Yeelights
@@ -17,6 +19,7 @@ class YeelightSearch extends EventEmitter {
     super();
 
     this.yeelights = [];
+    this.config = { refresh: SocketRefresh };
     this.log = debug(`YeelightSearch`);
     // Setting the sourcePort ensures multicast traffic is received
     this.client = new Client({ sourcePort: 1982, ssdpPort: 1982 });
@@ -38,11 +41,20 @@ class YeelightSearch extends EventEmitter {
       this.yeelights.push(yeelight);
       this.emit('found', yeelight);
     } else {
-      if (yeelight.status == 0) {
+      this.log(`Light id ${lightdata.ID} status: ${yeelight.status}`);
+
+      if ( yeelight.status === YeelightStatus.OFFLINE) {
         // Reconnect to light
         this.log(`Light id ${lightdata.ID} comming up`);
         yeelight.status = YeelightStatus.SSDP;
         yeelight.reconnect(lightdata);
+      } else {
+        if ( (Date.now() - yeelight.lastKnown) > SocketRefresh ) {
+          // Avoid double calling (SSDP messages repeats two or three times in a row)
+          yeelight.lastKnown += 100;
+          this.log(`Light id ${lightdata.ID} hasn't refreshed`);
+          yeelight.getValues('power', 'bright', 'rgb', 'color_mode','ct');
+        }
       }
     }
   }

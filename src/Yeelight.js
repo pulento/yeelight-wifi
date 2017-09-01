@@ -45,6 +45,7 @@ export default class Yeelight extends EventEmitter {
     this.hostname = parsedUri.hostname;
     this.supports = data.SUPPORT.split(' ');
     this.status = YeelightStatus.SSDP;
+    this.lastKnown = Date.now();
 
     this.reqCount = 1;
     this.log = debug(`Yeelight-${this.name}`);
@@ -146,11 +147,12 @@ export default class Yeelight extends EventEmitter {
               return;
             }
           });
+          resolve(this.reqCount);
           this.reqCount += 1;
         } else {
           this.log(`Not sending request for offline bulb`);
+          resolve();
         }
-        resolve();
       });
     });
   }
@@ -174,6 +176,7 @@ export default class Yeelight extends EventEmitter {
         return;
       }
 
+      this.lastKnown = Date.now();
       this.log(`got response: ${resp.toString().replace(/\r\n/, '')}`);
 
       if (json && json.error) {
