@@ -9,7 +9,8 @@ import { hexToRgb } from './utils';
 export const YeelightStatus = {
     OFFLINE : 0,
     SSDP : 1,
-    ONLINE : 2
+    UPDATING: 2,
+    ONLINE : 3
 }
 
 /**
@@ -38,6 +39,8 @@ export default class Yeelight extends EventEmitter {
       throw new Error(`${parsedUri.protocol} is not supported`);
     }
 
+    this.config = { refresh: 3*60 };
+
     this.id = data.ID;
     this.name = data.NAME;
     this.model = data.MODEL;
@@ -51,17 +54,17 @@ export default class Yeelight extends EventEmitter {
     this.log = debug(`Yeelight-${this.name}`);
 
     this.socket = new net.Socket();
+    this.socket.setKeepAlive(true);
+    this.socket.setTimeout(this.config.refresh*1000);
 
     this.socket.on('data', this.formatResponse.bind(this));
 
     this.socket.on('close', () => {
-      this.log(`closed connection to ${this.name} ${this.hostname}:${this.port}`);
+      this.log(`closed connection to ${this.name} id ${this.id} on ${this.hostname}:${this.port}`);
       this.status = YeelightStatus.OFFLINE;
     });
 
-    this.socket.on('timeout', () => {
-      this.log(`Connection timeout on ${this.name} ${this.hostname}:${this.port}`);
-    });
+    this.socket.on('timeout', this.refresh.bind(this));
 
     this.socket.on('error', (err) => {
       if (err.code == 'ECONNRESET') {
@@ -76,11 +79,15 @@ export default class Yeelight extends EventEmitter {
 	   });
 
     this.socket.connect(this.port, this.hostname, this.connect());
+
+    /*
+    if (this.config.refresh)
+      setInterval(this.refresh.bind(this), this.config.refresh*1000);
+      */
   }
 
   /**
    * reconnect reconnects to the light, use it when connection is reset after power failure
-   * @public
    *
    */
   reconnect (data) {
@@ -100,9 +107,18 @@ export default class Yeelight extends EventEmitter {
    *
    */
   connect () {
-    this.log(`connected to ${this.name} ${this.hostname}:${this.port}`);
+    this.log(`connected to ${this.name} id ${this.id} on ${this.hostname}:${this.port}`);
+    this.socket.setKeepAlive(true);
+    this.socket.setTimeout(this.config.refresh*1000);
     this.emit('connected');
     this.status = YeelightStatus.ONLINE;
+  }
+
+  refresh () {
+    this.log(`Connection refresh on ${this.name} id ${this.id} on ${this.hostname}:${this.port}`);
+    this.socket.setKeepAlive(true);
+    this.socket.setTimeout(this.config.refresh*1000);
+    this.getValues('power', 'bright', 'rgb', 'color_mode','ct');
   }
 
   /**
@@ -177,6 +193,8 @@ export default class Yeelight extends EventEmitter {
       }
 
       this.lastKnown = Date.now();
+      this.status = YeelightStatus.ONLINE;
+
       this.log(`got response: ${resp.toString().replace(/\r\n/, '')}`);
 
       if (json && json.error) {
