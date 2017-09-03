@@ -79,11 +79,6 @@ export default class Yeelight extends EventEmitter {
 	   });
 
     this.socket.connect(this.port, this.hostname, this.connect());
-
-    /*
-    if (this.config.refresh)
-      setInterval(this.refresh.bind(this), this.config.refresh*1000);
-      */
   }
 
   /**
@@ -114,6 +109,11 @@ export default class Yeelight extends EventEmitter {
     this.status = YeelightStatus.ONLINE;
   }
 
+  /**
+   * refresh function called periodically
+   * @private
+   *
+   */
   refresh () {
     this.log(`Connection refresh on ${this.name} id ${this.id} on ${this.hostname}:${this.port}`);
     this.socket.setKeepAlive(true);
@@ -162,9 +162,9 @@ export default class Yeelight extends EventEmitter {
               reject(err);
               return;
             }
+            resolve(this.reqCount);
+            this.reqCount += 1;
           });
-          resolve(this.reqCount);
-          this.reqCount += 1;
         } else {
           this.log(`Not sending request for offline bulb`);
           resolve();
