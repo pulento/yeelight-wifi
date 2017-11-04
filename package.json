@@ -12,7 +12,7 @@
     "babel-preset-env": "^1.6.0",
     "babel-register": "^6.14.0",
     "chai": "^4.1.1",
-    "codecov": "^2.2.0",
+    "codecov": "^3.0.0",
     "documentation": "^5.0.0",
     "eslint": "^3.19.0",
     "eslint-config-airbnb": "^12.0.0",
@@ -55,7 +55,7 @@
   "homepage": "https://github.com/pmdroid/yeelight-wifi#readme",
   "dependencies": {
     "debug": "^3.0.0",
-    "joi": "^11.0.0",
+    "joi": "^12.0.0",
     "node-ssdp": "^3.0.0"
   }
 }
